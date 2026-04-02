@@ -137,6 +137,13 @@ final class ChatStorage: @unchecked Sendable {
         return Chat(id: id, manifest: manifest, messages: messages)
     }
 
+    // MARK: - Cached Manifests
+
+    /// Synchronous access to all chat manifests, loaded lazily and cached.
+    var manifests: [ChatManifest] {
+        (try? listChats()) ?? []
+    }
+
     // MARK: - List
 
     func listChats() throws -> [ChatManifest] {

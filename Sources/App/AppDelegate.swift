@@ -4,16 +4,20 @@ import Carbon
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Carbon hotkey handle — mutable state isolated to MainActor.
-    private var hotKeyRef: EventHotKeyRef?
-
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var eventMonitor: Any?
+    private var globalHotkeyMonitor: Any?
+
+    // CGEvent tap for global hotkey
+    private var eventTap: CFMachPort?
 
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Request notification authorization
+        NotificationService.shared.requestAuthorization()
+
         setupStatusItem()
         setupPopover()
         setupEventMonitor()
@@ -69,41 +73,91 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Global Hotkey (⌘+Space)
+    // MARK: - Global Hotkey (⌘+Space) using CGEvent Tap
 
     private func registerGlobalHotkey() {
-        // ⌘+Space hotkey
-        var hotKeyID = EventHotKeyID()
-        hotKeyID.signature = OSType(0x41484953) // 'AHIS'
-        hotKeyID.id = 1
+        // Create event tap for key down events
+        // We need to monitor maskKeyDown to catch Cmd+Space
+        let eventMask = (1 << CGEventType.keyDown.rawValue)
 
-        // Cmd+Space: keycode 49 (space), modifiers: cmd (256)
-        let modifiers: UInt32 = UInt32(cmdKey)
-        let keyCode: UInt32 = 49
+        // Callback for CGEvent tap
+        let callback: CGEventTapCallBack = { proxy, type, event, refcon in
+            guard let refcon = refcon else { return Unmanaged.passRetained(event) }
 
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+            let appDelegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
 
-        let handler: EventHandlerUPP = { _, event, _ -> OSStatus in
-            DispatchQueue.main.async {
-                if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-                    appDelegate.togglePopover()
+            if type == .keyDown {
+                let flags = event.flags
+                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+
+                // Check for Cmd+Space: keycode 49 (Space), modifiers include Command
+                if keyCode == 49 && flags.contains(.maskCommand) && !flags.contains(.maskControl) && !flags.contains(.maskAlternate) {
+                    DispatchQueue.main.async {
+                        appDelegate.togglePopover()
+                    }
+                    // Consume the event
+                    return nil
                 }
             }
-            return noErr
+
+            return Unmanaged.passRetained(event)
         }
 
-        InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, nil, nil)
+        // Create the event tap
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: callback,
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else {
+            print("[Axis] Failed to create event tap. Check Accessibility permissions.")
+            // Fallback to less privileged monitoring
+            registerFallbackHotkey()
+            return
+        }
 
-        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
-        if status != noErr {
-            print("[Axis] Failed to register global hotkey: \(status)")
+        eventTap = tap
+
+        // Create run loop source and add to current run loop
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+
+        print("[Axis] Global hotkey registered (Cmd+Space)")
+    }
+
+    private func registerFallbackHotkey() {
+        // Fallback using NSEvent.addGlobalMonitorForEvents
+        // Note: This doesn't work when app is not active, but as a menu bar app
+        // the user expects Cmd+Space to work globally
+        globalHotkeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // Check for Cmd+Space
+            if event.modifierFlags.contains(.command) &&
+               !event.modifierFlags.contains(.control) &&
+               !event.modifierFlags.contains(.option) &&
+               event.keyCode == 49 {
+                DispatchQueue.main.async {
+                    self?.togglePopover()
+                }
+            }
         }
     }
 
     private func unregisterGlobalHotkey() {
-        if let ref = hotKeyRef {
-            UnregisterEventHotKey(ref)
-            hotKeyRef = nil
+        // Disable and remove event tap
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            eventTap = nil
+        }
+
+        // Remove fallback monitor
+        if let monitor = globalHotkeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalHotkeyMonitor = nil
         }
     }
 }

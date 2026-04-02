@@ -543,3 +543,28 @@ These are planned for future rounds but NOT in R1:
 - iOS companion app
 - Plugin marketplace
 - Custom model selection (beyond Claude)
+
+---
+
+## R2 Features (current)
+
+- [x] Light + dark mode (system preference, manual toggle)
+- [x] MCP server (stdio JSON-RPC 2.0, exposes tools to Claude Code)
+- [x] Skills system (natural language, ~/.axis/skills/*.md)
+- [x] Guardian (proactive Claude self-correction)
+- [x] Project Map (force-directed graph, SwiftUI Canvas)
+- [x] File indexer (dependencies via import parsing)
+- [x] Context trimming UI (per-message delete, tombstones)
+- [x] Background agents (Code Reviewer, Researcher)
+- [x] Notification service (UNUserNotificationCenter)
+- [x] Settings panel (theme, context, privacy)
+- [x] History tab (search, group by date, swipe delete)
+- [x] Skills panel (create, edit, invoke, toggle)
+
+## R3+ Planned
+
+- Voice input (faster-whisper + Haiku pipeline)
+- Live preview (browser without localhost)
+- Stop-safe architecture (handoff before stopping)
+- Encrypted chat storage
+- iOS companion
