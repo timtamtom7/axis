@@ -233,6 +233,43 @@ final class MCPServer: @unchecked Sendable {
                     ],
                     required: ["name"]
                 )
+            ),
+            MCPTool(
+                name: "axis_git_status",
+                description: "Returns current git status for the project",
+                inputSchema: MCPTool.MCPToolInputSchema(
+                    type: "object",
+                    properties: [
+                        "path": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "string", description: "Directory path (default: current directory)")
+                    ],
+                    required: nil
+                )
+            ),
+            MCPTool(
+                name: "axis_git_diff",
+                description: "Returns git diff for changed files",
+                inputSchema: MCPTool.MCPToolInputSchema(
+                    type: "object",
+                    properties: [
+                        "file": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "string", description: "Specific file to diff"),
+                        "staged": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "boolean", description: "Show staged diff"),
+                        "path": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "string", description: "Directory path (default: current directory)")
+                    ],
+                    required: nil
+                )
+            ),
+            MCPTool(
+                name: "axis_git_commit",
+                description: "Creates a commit with the given message",
+                inputSchema: MCPTool.MCPToolInputSchema(
+                    type: "object",
+                    properties: [
+                        "message": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "string", description: "Commit message"),
+                        "all": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "boolean", description: "Stage all changes before committing"),
+                        "path": MCPTool.MCPToolInputSchema.MCPToolProperty(type: "string", description: "Directory path (default: current directory)")
+                    ],
+                    required: ["message"]
+                )
             )
         ]
     }
@@ -474,6 +511,30 @@ final class MCPServer: @unchecked Sendable {
             }
 
             return try await self!.handleSkillInvoke(name: name)
+        }
+
+        // axis_git_status — returns git status
+        tools["axis_git_status"] = { [weak self] params in
+            let path = params.arguments?["path"] ?? FileManager.default.currentDirectoryPath
+            return try await self!.handleGitStatus(path: path)
+        }
+
+        // axis_git_diff — returns git diff
+        tools["axis_git_diff"] = { [weak self] params in
+            let file = params.arguments?["file"]
+            let staged = params.arguments?["staged"] == "true"
+            let path = params.arguments?["path"] ?? FileManager.default.currentDirectoryPath
+            return try await self!.handleGitDiff(file: file, staged: staged, path: path)
+        }
+
+        // axis_git_commit — creates a commit
+        tools["axis_git_commit"] = { [weak self] params in
+            guard let message = params.arguments?["message"] else {
+                throw MCPServerError.invalidParams("message required")
+            }
+            let all = params.arguments?["all"] == "true"
+            let path = params.arguments?["path"] ?? FileManager.default.currentDirectoryPath
+            return try await self!.handleGitCommit(message: message, all: all, path: path)
         }
     }
 
@@ -836,6 +897,239 @@ final class MCPServer: @unchecked Sendable {
             ],
             isError: !result.success
         )
+    }
+
+    // MARK: - Git Tool Handlers
+
+    private nonisolated func handleGitStatus(path: String) async throws -> MCPResultPayload {
+        return try await withCheckedThrowingContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", path, "status", "--porcelain"]
+            process.environment = ProcessInfo.processInfo.environment
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+
+                // Check if it's a git repo
+                if output.contains("fatal: not a git repository") {
+                    continuation.resume(throwing: MCPServerError.toolExecutionFailed("Not a git repository"))
+                    return
+                }
+
+                // Parse porcelain output
+                var modified: [String] = []
+                var untracked: [String] = []
+                var deleted: [String] = []
+
+                let lines = output.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                for line in lines {
+                    guard line.count >= 3 else { continue }
+                    let indexStatus = line.prefix(1)
+                    let workTreeStatus = line.dropFirst(1).prefix(1)
+                    let fileName = String(line.dropFirst(3))
+
+                    // Staged changes (index status)
+                    if indexStatus == "M" {
+                        modified.append(fileName)
+                    } else if indexStatus == "A" {
+                        modified.append(fileName)
+                    } else if indexStatus == "D" {
+                        deleted.append(fileName)
+                    }
+
+                    // Unstaged/untracked changes (work tree status)
+                    if workTreeStatus == "M" {
+                        if !modified.contains(fileName) {
+                            modified.append(fileName)
+                        }
+                    } else if workTreeStatus == "D" {
+                        if !deleted.contains(fileName) {
+                            deleted.append(fileName)
+                        }
+                    } else if indexStatus == "?" && workTreeStatus == "?" {
+                        untracked.append(fileName)
+                    }
+                }
+
+                let result: [String: Any] = [
+                    "modified": modified,
+                    "untracked": untracked,
+                    "deleted": deleted
+                ]
+
+                let jsonData = try! JSONSerialization.data(withJSONObject: result)
+                let jsonString = String(data: jsonData, encoding: .utf8)!
+
+                continuation.resume(returning: MCPResultPayload(
+                    content: [MCPResultPayload.MCPContentBlock(type: "text", text: jsonString)],
+                    isError: false
+                ))
+            } catch {
+                continuation.resume(throwing: MCPServerError.toolExecutionFailed("Git failed: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    private nonisolated func handleGitDiff(file: String?, staged: Bool, path: String) async throws -> MCPResultPayload {
+        return try await withCheckedThrowingContinuation { continuation in
+            var args = ["-C", path]
+            if staged {
+                args.append("--cached")
+            }
+            if let file = file, !file.isEmpty {
+                args.append("--")
+                args.append(file)
+            }
+            args.append("diff")
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = args
+            process.environment = ProcessInfo.processInfo.environment
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                var output = String(data: outputData, encoding: .utf8) ?? ""
+
+                // Check if it's a git repo
+                if output.contains("fatal: not a git repository") {
+                    continuation.resume(throwing: MCPServerError.toolExecutionFailed("Not a git repository"))
+                    return
+                }
+
+                // Truncate to 5000 chars
+                if output.count > 5000 {
+                    output = String(output.prefix(5000)) + "\n... (truncated)"
+                }
+
+                continuation.resume(returning: MCPResultPayload(
+                    content: [MCPResultPayload.MCPContentBlock(type: "text", text: output)],
+                    isError: false
+                ))
+            } catch {
+                continuation.resume(throwing: MCPServerError.toolExecutionFailed("Git diff failed: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    private nonisolated func handleGitCommit(message: String, all: Bool, path: String) async throws -> MCPResultPayload {
+        return try await withCheckedThrowingContinuation { continuation in
+            // First check if it's a git repo
+            let statusProcess = Process()
+            statusProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            statusProcess.arguments = ["-C", path, "status", "--porcelain"]
+            statusProcess.environment = ProcessInfo.processInfo.environment
+
+            let statusPipe = Pipe()
+            statusProcess.standardOutput = statusPipe
+            statusProcess.standardError = Pipe()
+
+            do {
+                try statusProcess.run()
+                statusProcess.waitUntilExit()
+
+                let statusData = statusPipe.fileHandleForReading.readDataToEndOfFile()
+                let statusOutput = String(data: statusData, encoding: .utf8) ?? ""
+
+                if statusOutput.contains("fatal: not a git repository") {
+                    continuation.resume(throwing: MCPServerError.toolExecutionFailed("Not a git repository"))
+                    return
+                }
+
+                // If --all flag is used, stage all changes first
+                if all {
+                    let addProcess = Process()
+                    addProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                    addProcess.arguments = ["-C", path, "add", "-A"]
+                    addProcess.environment = ProcessInfo.processInfo.environment
+
+                    try addProcess.run()
+                    addProcess.waitUntilExit()
+                }
+
+                // Run git commit
+                let commitProcess = Process()
+                commitProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                commitProcess.arguments = ["-C", path, "commit", "-m", message]
+                commitProcess.environment = ProcessInfo.processInfo.environment
+
+                let outputPipe = Pipe()
+                let errorPipe = Pipe()
+                commitProcess.standardOutput = outputPipe
+                commitProcess.standardError = errorPipe
+
+                try commitProcess.run()
+                commitProcess.waitUntilExit()
+
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+
+                // Check for "nothing to commit"
+                if output.lowercased().contains("nothing to commit") || errorOutput.lowercased().contains("nothing to commit") {
+                    continuation.resume(throwing: MCPServerError.toolExecutionFailed("Nothing to commit"))
+                    return
+                }
+
+                // Check for failure
+                if commitProcess.terminationStatus != 0 {
+                    let errorMsg = errorOutput.isEmpty ? output : errorOutput
+                    continuation.resume(throwing: MCPServerError.toolExecutionFailed("Git commit failed: \(errorMsg)"))
+                    return
+                }
+
+                // Parse SHA from output (format: "[branch abc1234] message")
+                var sha = ""
+                let lines = output.components(separatedBy: .newlines)
+                for line in lines {
+                    if line.contains("]") {
+                        let bracketContent = line.components(separatedBy: "]").first ?? ""
+                        let shaPart = bracketContent.replacingOccurrences(of: "[", with: "")
+                        // Extract short SHA (first 7 chars after branch name)
+                        let parts = shaPart.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+                        if parts.count >= 2 {
+                            sha = String(parts[1].prefix(7))
+                        }
+                        break
+                    }
+                }
+
+                let result: [String: Any] = [
+                    "success": true,
+                    "sha": sha,
+                    "message": message
+                ]
+
+                let jsonData = try! JSONSerialization.data(withJSONObject: result)
+                let jsonString = String(data: jsonData, encoding: .utf8)!
+
+                continuation.resume(returning: MCPResultPayload(
+                    content: [MCPResultPayload.MCPContentBlock(type: "text", text: jsonString)],
+                    isError: false
+                ))
+            } catch {
+                continuation.resume(throwing: MCPServerError.toolExecutionFailed("Git commit failed: \(error.localizedDescription)"))
+            }
+        }
     }
 }
 
