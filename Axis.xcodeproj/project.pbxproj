@@ -24,6 +24,7 @@
 		5CAE5385D553A89DA027B46B /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D59EA7891336234F7D8198 /* ChatView.swift */; };
 		62915AEFC7275C7C4517190F /* GraphNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80987B7D361E3D67BE026F3B /* GraphNode.swift */; };
 		67E058A2973B95E16463AC91 /* ContextManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CEC593D46FA6A8E01E0DB9 /* ContextManager.swift */; };
+		6A5A85C97D90B640244A628C /* ProjectPromptManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ED328E80CB41170E72E8993 /* ProjectPromptManager.swift */; };
 		6BB99D08CB4A879B2E2FD550 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEA6950501F7F788507952D /* Typography.swift */; };
 		721091183B82A6C938FCEFF7 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6982478F63F61AE6290B01B1 /* MenuBarController.swift */; };
 		7944F30C6A06ECAD1637172D /* ComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C77C85771BDA89DD1934D786 /* ComposeView.swift */; };
@@ -72,6 +73,7 @@
 		52A0D01A3E6D582C47230C69 /* Colors.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Colors.xcassets; sourceTree = "<group>"; };
 		5456245854E6D25C5E8E6029 /* MessageBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubbleView.swift; sourceTree = "<group>"; };
 		546B42D0C9ABCEBB94EBD739 /* ClaudeCodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeService.swift; sourceTree = "<group>"; };
+		5ED328E80CB41170E72E8993 /* ProjectPromptManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectPromptManager.swift; sourceTree = "<group>"; };
 		61948BBFD1E3A317E8E23948 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6982478F63F61AE6290B01B1 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		6B06786A7A153E92C91528E1 /* SkillRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillRunner.swift; sourceTree = "<group>"; };
@@ -133,6 +135,7 @@
 				B7CEC593D46FA6A8E01E0DB9 /* ContextManager.swift */,
 				271F327845B949746BC379BB /* HapticService.swift */,
 				9B9EA0ABD507F06EF6DBC173 /* MCPServer.swift */,
+				5ED328E80CB41170E72E8993 /* ProjectPromptManager.swift */,
 				8EE80A4ED1008AC2B8313B85 /* SessionManager.swift */,
 				6B06786A7A153E92C91528E1 /* SkillRunner.swift */,
 			);
@@ -387,6 +390,7 @@
 				E805D506561ABCE7617DB92E /* NotificationService.swift in Sources */,
 				BC9EA465A831E0BD5690692E /* PhysicsSimulation.swift in Sources */,
 				B6A1A889FD4954425899776F /* PopoverContentView.swift in Sources */,
+				6A5A85C97D90B640244A628C /* ProjectPromptManager.swift in Sources */,
 				379E91E6822F7DBDB8C99743 /* SessionManager.swift in Sources */,
 				BB02A9C32773D74BFDF850E5 /* SettingsStore.swift in Sources */,
 				1CA6FB3E6E96B350E0BC7A6E /* SettingsView.swift in Sources */,
