@@ -116,10 +116,20 @@ actor ClaudeCodeRunner {
 
     /// Stops the Claude Code process.
     func stop() async {
+        await gracefulStop()
+    }
+
+    /// Graceful stop: save context before terminating Claude Code.
+    /// Context is saved to disk so no work is lost.
+    func gracefulStop() async {
         guard case .running = state else { return }
 
         state = .stopping
 
+        // Stop-safe: save session context before killing the process
+        _ = await SessionManager.shared.prepareGracefulStop()
+
+        // Now terminate
         process?.terminate()
 
         // Close pipes
@@ -128,6 +138,23 @@ actor ClaudeCodeRunner {
         errorPipe?.fileHandleForReading.closeFile()
 
         // Stop MCP server
+        await mcpServer?.stop()
+
+        state = .idle
+    }
+
+    /// Force stop: terminate immediately without saving context.
+    /// Use only when context has already been saved or is not needed.
+    func forceStop() async {
+        guard case .running = state else { return }
+
+        state = .stopping
+        process?.terminate()
+
+        inputPipe?.fileHandleForWriting.closeFile()
+        outputPipe?.fileHandleForReading.closeFile()
+        errorPipe?.fileHandleForReading.closeFile()
+
         await mcpServer?.stop()
 
         state = .idle

@@ -15,6 +15,7 @@
 		1CA6FB3E6E96B350E0BC7A6E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D59E17667F755160EC997E /* SettingsView.swift */; };
 		376D8F8E01CB021619BE81E6 /* HapticService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271F327845B949746BC379BB /* HapticService.swift */; };
 		3794A932252AD917342FF070 /* SkillEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B968CDC174AE5F69DB398AAF /* SkillEditorView.swift */; };
+		379E91E6822F7DBDB8C99743 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE80A4ED1008AC2B8313B85 /* SessionManager.swift */; };
 		493BCDC891CC7644F564AD1F /* GuardianService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F942DE47ABB6736A07DB4A68 /* GuardianService.swift */; };
 		4A53275F17B1F50FADBE8036 /* MessageBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5456245854E6D25C5E8E6029 /* MessageBubbleView.swift */; };
 		4E2DA4634342117D863AEC03 /* ContextRingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B0AAD78A4EE8FFFC762846 /* ContextRingView.swift */; };
@@ -83,6 +84,7 @@
 		89D59E17667F755160EC997E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		89E9F0DD7F188ED6D5C6F0C8 /* VoiceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceService.swift; sourceTree = "<group>"; };
 		8BF1293575ECB6E7302E8201 /* EmptyChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyChatView.swift; sourceTree = "<group>"; };
+		8EE80A4ED1008AC2B8313B85 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		94E945D9F12D3BECCA060F6E /* Axis.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Axis.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B9EA0ABD507F06EF6DBC173 /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		9C7182BB458D37A20016B45D /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
@@ -131,6 +133,7 @@
 				B7CEC593D46FA6A8E01E0DB9 /* ContextManager.swift */,
 				271F327845B949746BC379BB /* HapticService.swift */,
 				9B9EA0ABD507F06EF6DBC173 /* MCPServer.swift */,
+				8EE80A4ED1008AC2B8313B85 /* SessionManager.swift */,
 				6B06786A7A153E92C91528E1 /* SkillRunner.swift */,
 			);
 			path = Core;
@@ -384,6 +387,7 @@
 				E805D506561ABCE7617DB92E /* NotificationService.swift in Sources */,
 				BC9EA465A831E0BD5690692E /* PhysicsSimulation.swift in Sources */,
 				B6A1A889FD4954425899776F /* PopoverContentView.swift in Sources */,
+				379E91E6822F7DBDB8C99743 /* SessionManager.swift in Sources */,
 				BB02A9C32773D74BFDF850E5 /* SettingsStore.swift in Sources */,
 				1CA6FB3E6E96B350E0BC7A6E /* SettingsView.swift in Sources */,
 				7BC4C92BED89C23F7A958CFF /* Skill.swift in Sources */,

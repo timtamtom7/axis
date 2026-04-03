@@ -25,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Save current session synchronously before quitting.
+        // The OS gives apps ~1 second to finish WillTerminate,
+        // which is enough to write the session file atomically.
+        SessionManager.shared.saveCurrentSession()
         unregisterGlobalHotkey()
     }
 
