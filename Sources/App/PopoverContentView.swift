@@ -49,7 +49,7 @@ struct PopoverContentView: View {
                 chatTab
                     .tag(Tab.chat)
 
-                PlaceholderTab(title: "Project Map")
+                MapView(projectPath: nil)
                     .tag(Tab.map)
 
                 HistoryView(
@@ -63,7 +63,7 @@ struct PopoverContentView: View {
                 )
                 .tag(Tab.history)
 
-                PlaceholderTab(title: "Skills")
+                SkillsView()
                     .tag(Tab.skills)
 
                 SettingsView()

@@ -78,7 +78,7 @@ struct SkillsView: View {
 
     private let skillsDirectory: URL = {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".axisblueprint/skills")
+            .appendingPathComponent(".axis/skills")
     }()
 
     private var filteredSkills: [Skill] {
