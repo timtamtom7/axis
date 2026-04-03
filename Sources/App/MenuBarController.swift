@@ -16,7 +16,7 @@ final class MenuBarController: NSObject, ObservableObject {
 
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
-    private var eventMonitor: Any?
+    private nonisolated(unsafe) var eventMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Configuration

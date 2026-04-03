@@ -20,7 +20,7 @@ struct SkillEditorView: View {
 
     @State private var name: String = ""
     @State private var description: String = ""
-    @State private var selectedType: SkillType = .mcp
+    @State private var selectedType: Skill.SkillType = .mcp
     @State private var content: String = ""
     @State private var showValidation = false
 
@@ -37,8 +37,9 @@ struct SkillEditorView: View {
             name: name.isEmpty ? "Skill Name" : name,
             description: description.isEmpty ? "Skill description" : description,
             type: selectedType,
-            content: content,
-            isEnabled: true
+            filePath: skill?.filePath ?? "",
+            isEnabled: true,
+            content: content
         )
     }
 
@@ -118,8 +119,9 @@ struct SkillEditorView: View {
                     name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                     description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                     type: selectedType,
-                    content: content,
-                    isEnabled: skill?.isEnabled ?? true
+                    filePath: skill?.filePath ?? "",
+                    isEnabled: skill?.isEnabled ?? true,
+                    content: content
                 )
                 onSave(saved)
                 dismiss()
@@ -178,7 +180,7 @@ struct SkillEditorView: View {
 
                 fieldGroup("TYPE") {
                     HStack(spacing: AxisSpacing.space2) {
-                        ForEach(SkillType.allCases) { type in
+                        ForEach(Skill.SkillType.allCases) { type in
                             SkillTypePickerRow(
                                 type: type,
                                 isSelected: selectedType == type,
@@ -332,7 +334,7 @@ struct SkillEditorView: View {
 // MARK: - SkillTypePickerRow
 
 private struct SkillTypePickerRow: View {
-    let type: SkillType
+    let type: Skill.SkillType
     let isSelected: Bool
     let onSelect: () -> Void
 
@@ -377,6 +379,7 @@ private struct SkillTypePickerRow: View {
             name: "Code Review",
             description: "Reviews changed files after commits.",
             type: .agent,
+            filePath: "",
             content: "# Skill: Code Review\n\nYou are a code reviewer..."
         ),
         onSave: { _ in },

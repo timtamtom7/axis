@@ -4,13 +4,26 @@ import Foundation
 
 /// Parameters passed to an MCP tool call.
 struct MCPRequestParams: Codable {
-    let name: String
+    let name: String?
     let arguments: [String: String]?
+
+    init(name: String? = nil, arguments: [String: String]? = nil) {
+        self.name = name
+        self.arguments = arguments
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
         arguments = try container.decodeIfPresent([String: String].self, forKey: .arguments)
     }
+
+    /// Convert from MCPRequest.MCPRequestParams
+    init(from other: MCPRequest.MCPRequestParams) {
+        self.name = other.name
+        self.arguments = other.arguments
+    }
+
     enum CodingKeys: String, CodingKey {
         case name, arguments
     }
@@ -19,7 +32,7 @@ struct MCPRequestParams: Codable {
 /// MCPServer implements the server side of the MCP protocol.
 /// Axis acts as an MCP server that Claude Code connects to via `--mcp` flag.
 /// Communication is JSON-RPC 2.0 over stdin/stdout.
-actor MCPServer {
+final class MCPServer: @unchecked Sendable {
     // MARK: - Types
 
     typealias ToolHandler = (MCPRequestParams) async throws -> MCPResultPayload
@@ -86,7 +99,7 @@ actor MCPServer {
     }
 
     /// Registers a custom tool handler.
-    func registerTool(name: String, handler: ToolHandler) {
+    func registerTool(name: String, handler: @escaping ToolHandler) {
         tools[name] = handler
     }
 
@@ -247,11 +260,11 @@ actor MCPServer {
         let idValue = json["id"]
         let id: MCPMessageID
         if let intId = idValue as? Int {
-            id = MCPMessageID(integer: intId)
+            id = MCPMessageID.integer(intId)
         } else if let stringId = idValue as? String {
-            id = MCPMessageID(string: stringId)
+            id = MCPMessageID.string(stringId)
         } else {
-            id = MCPMessageID(integer: 0)
+            id = MCPMessageID.integer(0)
         }
 
         switch method {
@@ -325,7 +338,7 @@ actor MCPServer {
                 guard let handler = tools[toolName] else {
                     throw MCPServerError.methodNotFound(toolName)
                 }
-                let result = try await handler(request.params)
+                let result = try await handler(MCPRequestParams(from: params))
                 return MCPMessage.response(MCPResponse(id: request.id, result: result, error: nil))
             } catch let error as MCPServerError {
                 let (code, message) = errorCodeAndMessage(for: error)
@@ -381,21 +394,19 @@ actor MCPServer {
     private func registerBuiltInTools() {
         // axis_read — read file with context
         tools["axis_read"] = { [weak self] params in
-            guard let p = params else { throw MCPServerError.invalidParams("params required") }
-            guard let path = p.arguments?["path"] ?? p.arguments?["name"] else {
+            guard let path = params.arguments?["path"] ?? params.arguments?["name"] else {
                 throw MCPServerError.invalidParams("path required")
             }
 
-            let maxLines = params.arguments?["max_lines"]?.flatMap { Int($0) }
-            let startLine = params.arguments?["start_line"]?.flatMap { Int($0) }
+            let maxLines = params.arguments?["max_lines"].flatMap { (v: String) -> Int? in Int(v) }
+            let startLine = params.arguments?["start_line"].flatMap { (v: String) -> Int? in Int(v) }
 
             return try await self!.handleRead(path: path, maxLines: maxLines, startLine: startLine)
         }
 
         // axis_write — write file atomically
         tools["axis_write"] = { [weak self] params in
-            guard let params = params,
-                  let path = params.arguments?["path"],
+            guard let path = params.arguments?["path"],
                   let content = params.arguments?["content"] else {
                 throw MCPServerError.invalidParams("path and content required")
             }
@@ -405,8 +416,7 @@ actor MCPServer {
 
         // axis_edit — targeted edit using line ranges
         tools["axis_edit"] = { [weak self] params in
-            guard let params = params,
-                  let path = params.arguments?["path"],
+            guard let path = params.arguments?["path"],
                   let oldText = params.arguments?["old_text"],
                   let newText = params.arguments?["new_text"] else {
                 throw MCPServerError.invalidParams("path, old_text, new_text required")
@@ -417,8 +427,7 @@ actor MCPServer {
 
         // axis_search — grep across project files
         tools["axis_search"] = { [weak self] params in
-            guard let params = params,
-                  let query = params.arguments?["query"] else {
+            guard let query = params.arguments?["query"] else {
                 throw MCPServerError.invalidParams("query required")
             }
 
@@ -460,8 +469,7 @@ actor MCPServer {
 
         // axis_skill_invoke — invoke a skill by name
         tools["axis_skill_invoke"] = { [weak self] params in
-            guard let params = params,
-                  let name = params.arguments?["name"] else {
+            guard let name = params.arguments?["name"] else {
                 throw MCPServerError.invalidParams("skill name required")
             }
 
@@ -567,53 +575,57 @@ actor MCPServer {
         }
     }
 
-    private func handleSearch(query: String, path: String, caseSensitive: Bool) async throws -> MCPResultPayload {
+    private nonisolated func handleSearch(query: String, path: String, caseSensitive: Bool) async throws -> MCPResultPayload {
         var searchPath = path
         if searchPath == "." {
             searchPath = FileManager.default.currentDirectoryPath
         }
 
-        var results: [String] = []
-        let fileManager = FileManager.default
+        let results: [String] = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[String], Error>) in
+            var localResults: [String] = []
+            let fileManager = FileManager.default
 
-        guard let enumerator = fileManager.enumerator(
-            at: URL(fileURLWithPath: searchPath),
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else {
-            throw MCPServerError.toolExecutionFailed("Could not enumerate directory: \(searchPath)")
-        }
-
-        for case let fileURL as URL in enumerator {
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
-                  resourceValues.isRegularFile == true else {
-                continue
+            guard let enumerator = fileManager.enumerator(
+                at: URL(fileURLWithPath: searchPath),
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            ) else {
+                continuation.resume(throwing: MCPServerError.toolExecutionFailed("Could not enumerate directory: \(searchPath)"))
+                return
             }
 
-            let ext = fileURL.pathExtension.lowercased()
-            guard ["swift", "md", "json", "yml", "yaml", "txt", "sh", "zsh", "bash", "py", "js", "ts", "tsx", "jsx", "html", "css"].contains(ext) else {
-                continue
-            }
+            for case let fileURL as URL in enumerator {
+                guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
+                      resourceValues.isRegularFile == true else {
+                    continue
+                }
 
-            guard let fileContent = try? String(contentsOf: fileURL, encoding: .utf8) else {
-                continue
-            }
+                let ext = fileURL.pathExtension.lowercased()
+                guard ["swift", "md", "json", "yml", "yaml", "txt", "sh", "zsh", "bash", "py", "js", "ts", "tsx", "jsx", "html", "css"].contains(ext) else {
+                    continue
+                }
 
-            let options: String.CompareOptions = caseSensitive ? [] : .caseInsensitive
-            if fileContent.range(of: query, options: options) != nil {
-                // Find line numbers with matches
-                let lines = fileContent.components(separatedBy: .newlines)
-                for (idx, line) in lines.enumerated() {
-                    if line.range(of: query, options: options) != nil {
-                        let truncatedLine = line.trimmingCharacters(in: .whitespaces)
-                        if truncatedLine.count > 150 {
-                            results.append("\(fileURL.path):\(idx + 1): \(truncatedLine.prefix(150))...")
-                        } else {
-                            results.append("\(fileURL.path):\(idx + 1): \(truncatedLine)")
+                guard let fileContent = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                    continue
+                }
+
+                let options: String.CompareOptions = caseSensitive ? [] : .caseInsensitive
+                if fileContent.range(of: query, options: options) != nil {
+                    // Find line numbers with matches
+                    let lines = fileContent.components(separatedBy: .newlines)
+                    for (idx, line) in lines.enumerated() {
+                        if line.range(of: query, options: options) != nil {
+                            let truncatedLine = line.trimmingCharacters(in: .whitespaces)
+                            if truncatedLine.count > 150 {
+                                localResults.append("\(fileURL.path):\(idx + 1): \(truncatedLine.prefix(150))...")
+                            } else {
+                                localResults.append("\(fileURL.path):\(idx + 1): \(truncatedLine)")
+                            }
                         }
                     }
                 }
             }
+            continuation.resume(returning: localResults)
         }
 
         let output = results.isEmpty
@@ -827,12 +839,4 @@ actor MCPServer {
     }
 }
 
-// MARK: - MCPResponse Extension for Result/Error
 
-extension MCPResponse {
-    init(id: MCPMessageID, result: MCPResultPayload?, error: MCPErrorPayload?) {
-        self.id = id
-        self.result = result
-        self.error = error
-    }
-}

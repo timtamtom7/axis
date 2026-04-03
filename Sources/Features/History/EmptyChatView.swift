@@ -5,7 +5,7 @@ import SwiftUI
 // Empty state when no chat is selected or first launch.
 // Warm, inviting — not corporate. One primary action.
 
-struct EmptyChatView {
+struct EmptyChatView: View {
     let onNewChat: () -> Void
 
     var body: some View {

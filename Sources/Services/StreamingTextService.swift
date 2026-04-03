@@ -29,6 +29,7 @@ struct StreamEvent: Identifiable, Equatable {
 }
 
 /// Service for parsing Claude Code streaming output (SSE-like events)
+@MainActor
 final class StreamingTextService: ObservableObject {
     static let shared = StreamingTextService()
 

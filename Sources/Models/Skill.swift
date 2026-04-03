@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Skill Model
 
@@ -10,6 +11,7 @@ struct Skill: Identifiable, Codable, Sendable {
     var type: SkillType
     var filePath: String
     var isEnabled: Bool
+    var content: String
 
     init(
         id: UUID = UUID(),
@@ -17,7 +19,8 @@ struct Skill: Identifiable, Codable, Sendable {
         description: String,
         type: SkillType,
         filePath: String,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        content: String = ""
     ) {
         self.id = id
         self.name = name
@@ -25,12 +28,31 @@ struct Skill: Identifiable, Codable, Sendable {
         self.type = type
         self.filePath = filePath
         self.isEnabled = isEnabled
+        self.content = content
     }
 
-    enum SkillType: String, Codable, Sendable {
+    enum SkillType: String, Codable, Sendable, CaseIterable, Identifiable {
         case mcp     // Wraps an MCP tool
         case agent   // Spawns a background agent
         case custom  // User-defined natural language
+
+        var id: String { rawValue }
+
+        var color: Color {
+            switch self {
+            case .mcp:    return Color(hex: 0x4B9EFF)
+            case .agent:  return Color(hex: 0x7B61FF)
+            case .custom: return Color(hex: 0xF1DDBC)
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .mcp:    return "puzzlepiece.fill"
+            case .agent:  return "cpu"
+            case .custom: return "wand.and.stars"
+            }
+        }
     }
 }
 
@@ -94,26 +116,27 @@ enum MCPMessage: Codable, Sendable {
         }
 
         // Check if this is a response (has result or error) or request/notification
+        let idValue: MCPMessageID
+        if let intId = try? container.decode(Int.self, forKey: .id) {
+            idValue = .integer(intId)
+        } else if let stringId = try? container.decode(String.self, forKey: .id) {
+            idValue = .string(stringId)
+        } else {
+            idValue = .integer(0)
+        }
+
         if let result = try container.decodeIfPresent(MCPResultPayload.self, forKey: .result) {
-            let id = try container.decode(Int?.self, forKey: .id) ?? container.decode(String?.self, forKey: .id) ?? 0
-            let response = MCPResponse(id: .init(integer: id), result: result)
+            let response = MCPResponse(id: idValue, result: result)
             self = .response(response)
         } else if let error = try container.decodeIfPresent(MCPErrorPayload.self, forKey: .error) {
-            let id = try container.decode(Int?.self, forKey: .id) ?? container.decode(String?.self, forKey: .id) ?? 0
-            let response = MCPResponse(id: .init(integer: id), error: error)
+            let response = MCPResponse(id: idValue, error: error)
             self = .response(response)
         } else {
             let method = try container.decode(String.self, forKey: .method)
-            let id = try container.decodeIfPresent(Int?.self, forKey: .id) ?? try container.decodeIfPresent(String?.self, forKey: .id)
-            let params = try container.decodeIfPresent(MCPRequestParams.self, forKey: .params)
+            let params = try container.decodeIfPresent(MCPRequest.MCPRequestParams.self, forKey: .params)
 
-            if id != nil {
-                let request = MCPRequest(id: .init(integer: id ?? 0), method: method, params: params)
-                self = .request(request)
-            } else {
-                let notification = MCPNotification(method: method, params: params)
-                self = .notification(notification)
-            }
+            let request = MCPRequest(id: idValue, method: method, params: params)
+            self = .request(request)
         }
     }
 
@@ -124,9 +147,9 @@ enum MCPMessage: Codable, Sendable {
         switch self {
         case .request(let req):
             try container.encode(req.method, forKey: .method)
-            if let idInt = req.id.value as? Int {
+            if let idInt = req.id.intValue {
                 try container.encode(idInt, forKey: .id)
-            } else if let idString = req.id.value as? String {
+            } else if let idString = req.id.stringValue {
                 try container.encode(idString, forKey: .id)
             }
             if let params = req.params {
@@ -139,9 +162,9 @@ enum MCPMessage: Codable, Sendable {
             if let error = resp.error {
                 try container.encode(error, forKey: .error)
             }
-            if let idInt = resp.id.value as? Int {
+            if let idInt = resp.id.intValue {
                 try container.encode(idInt, forKey: .id)
-            } else if let idString = resp.id.value as? String {
+            } else if let idString = resp.id.stringValue {
                 try container.encode(idString, forKey: .id)
             }
         case .notification(let notif):
@@ -199,35 +222,18 @@ struct MCPNotification: Codable, Sendable {
 
 // MARK: - Message ID
 
-struct MCPMessageID: Codable, Sendable {
-    let value: Any
+enum MCPMessageID: Codable, Sendable {
+    case integer(Int)
+    case string(String)
 
-    init(integer: Int) {
-        self.value = integer
+    var intValue: Int? {
+        if case .integer(let v) = self { return v }
+        return nil
     }
 
-    init(string: String) {
-        self.value = string
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let intVal = try? container.decode(Int.self) {
-            value = intVal
-        } else if let stringVal = try? container.decode(String.self) {
-            value = stringVal
-        } else {
-            throw MCPServerError.invalidMessageID
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        if let intVal = value as? Int {
-            try container.encode(intVal)
-        } else if let stringVal = value as? String {
-            try container.encode(stringVal)
-        }
+    var stringValue: String? {
+        if case .string(let v) = self { return v }
+        return nil
     }
 }
 

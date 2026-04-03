@@ -12,7 +12,7 @@ struct HistoryView: View {
     let onDeleteChat: (UUID) -> Void
 
     @State private var searchText = ""
-    @State private var searchFocused = false
+    @FocusState private var searchFocused: Bool
     @State private var chatToDelete: ChatStorage.ChatManifest?
     @State private var showDeleteConfirmation = false
 

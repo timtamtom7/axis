@@ -175,8 +175,7 @@ struct HighlightedText: View {
         }
     }
 
-    @ViewBuilder
-    private var highlightedTextModern: some View {
+    private var highlightedTextModern: Text {
         var result = Text("")
         let parts = text.components(separatedBy: "**")
 
@@ -195,6 +194,6 @@ struct HighlightedText: View {
             }
         }
 
-        result
+        return result
     }
 }

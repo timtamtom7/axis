@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// File-based chat persistence layer.
 /// Chats are stored in `~/.axisblueprint/chats/` as:
@@ -6,7 +7,7 @@ import Foundation
 ///     manifest.json    — metadata (title, created, message count, token estimate)
 ///     messages/
 ///       <timestamp>-<uuid>.json  — individual message files
-final class ChatStorage: @unchecked Sendable {
+final class ChatStorage: ObservableObject, @unchecked Sendable {
     // MARK: - Directory Layout
 
     private let baseURL: URL
@@ -26,7 +27,7 @@ final class ChatStorage: @unchecked Sendable {
 
     // MARK: - Chat Operations
 
-    struct ChatManifest: Codable {
+    struct ChatManifest: Codable, Identifiable {
         let id: UUID
         var title: String
         let createdAt: Date

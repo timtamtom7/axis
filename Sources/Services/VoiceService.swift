@@ -1,9 +1,11 @@
 import Foundation
 import AppKit
+import AVFoundation
 import Combine
 
 /// Voice input service stub for R2
 /// Structure is ready for faster-whisper integration in R3
+@MainActor
 final class VoiceService: NSObject, ObservableObject {
     static let shared = VoiceService()
 

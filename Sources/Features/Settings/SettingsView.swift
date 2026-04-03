@@ -172,7 +172,7 @@ private struct ContextSettingsContent: View {
                         }
 
                         Slider(
-                            contextLimitBinding,
+                            value: contextLimitBinding,
                             in: 100_000...200_000,
                             step: 10_000
                         )
@@ -210,7 +210,7 @@ private struct ContextSettingsContent: View {
                             }
 
                             Slider(
-                                trimThresholdBinding,
+                                value: trimThresholdBinding,
                                 in: 50_000...Double(settings.contextLimit - 10_000),
                                 step: 5_000
                             )
@@ -414,6 +414,20 @@ private struct SettingsRow<Content: View>: View {
             content()
         }
     }
+}
+
+// MARK: - Factory Helpers
+
+// Note: @escaping @ViewBuilder closures return `some View` which is not Sendable.
+// This is safe here as these helpers are only called from the main actor on the main thread.
+@MainActor
+private func settingsSection(_ title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
+    SettingsSection(title: title, content: content)
+}
+
+@MainActor
+private func settingsRow(_ label: String, @ViewBuilder content: @escaping () -> some View) -> some View {
+    SettingsRow(label: label, content: content)
 }
 
 // MARK: - Preview

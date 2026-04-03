@@ -39,7 +39,7 @@ struct PopoverContentView: View {
                 .background(Color.axisBorder)
 
             // Tab bar
-            TabBar(selectedTab: $selectedTab)
+            TabBar
 
             Divider()
                 .background(Color.axisBorder)

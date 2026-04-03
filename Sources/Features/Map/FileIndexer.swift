@@ -3,6 +3,7 @@ import Combine
 
 // MARK: - FileIndexer
 
+@MainActor
 final class FileIndexer: ObservableObject {
     // MARK: - Published State
 
@@ -237,7 +238,7 @@ final class FileIndexer: ObservableObject {
             // import "Foo.swift" or import "Foo/Foo.swift"
             if trimmed.hasPrefix("import \"") {
                 if let endQuote = trimmed.dropFirst(8).firstIndex(of: #"""#) {
-                    let importedFile = String(trimmed.dropFirst(8).prefix(until: endQuote))
+                    let importedFile = String(trimmed.dropFirst(8).prefix(upTo: endQuote))
                     let fullPath = (nodeDir as NSString).appendingPathComponent(importedFile)
                     deps.append(fullPath)
                 }

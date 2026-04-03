@@ -1,38 +1,12 @@
 import SwiftUI
 
-// MARK: - SkillType
-
-enum SkillType: String, CaseIterable, Identifiable {
-    case mcp = "MCP"
-    case agent = "Agent"
-    case custom = "Custom"
-
-    var id: String { rawValue }
-
-    var color: Color {
-        switch self {
-        case .mcp:    return Color(hex: 0x4B9EFF)   // blue
-        case .agent:  return Color(hex: 0x7B61FF)  // purple
-        case .custom: return Color(hex: 0xF1DDBC)  // gold
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .mcp:    return "puzzlepiece.fill"
-        case .agent:  return "cpu"
-        case .custom: return "wand.and.stars"
-        }
-    }
-}
-
 // MARK: - Skill
 
 struct SkillRow: Identifiable, Equatable {
     let id: UUID
     var name: String
     var description: String
-    var type: SkillType
+    var type: Skill.SkillType
     var content: String
     var isEnabled: Bool
 
@@ -40,7 +14,7 @@ struct SkillRow: Identifiable, Equatable {
         id: UUID = UUID(),
         name: String,
         description: String,
-        type: SkillType,
+        type: Skill.SkillType,
         content: String = "",
         isEnabled: Bool = true
     ) {
@@ -57,32 +31,38 @@ struct SkillRow: Identifiable, Equatable {
         Skill(
             name: "Handoff",
             description: "Transfers entire context to a new chat. Claude names the chat.",
-            type: .mcp
+            type: .mcp,
+            filePath: ""
         ),
         Skill(
             name: "Remember",
             description: "Semantic search across all saved chats. 'Remember when we talked about X'",
-            type: .mcp
+            type: .mcp,
+            filePath: ""
         ),
         Skill(
             name: "Context Trim",
             description: "Surgically removes tool call bloat while preserving conversation meaning.",
-            type: .mcp
+            type: .mcp,
+            filePath: ""
         ),
         Skill(
             name: "Guardian",
             description: "Manages false modesty rules — keeps Claude confident and capable.",
-            type: .mcp
+            type: .mcp,
+            filePath: ""
         ),
         Skill(
             name: "Code Review",
             description: "Reviews changed files after commits. Posts findings as a chat message.",
-            type: .agent
+            type: .agent,
+            filePath: ""
         ),
         Skill(
             name: "Researcher",
             description: "Finds edge cases and missing test coverage in parallel with Code Reviewer.",
-            type: .agent
+            type: .agent,
+            filePath: ""
         ),
     ]
 }
@@ -314,6 +294,7 @@ struct SkillsView: View {
                             name: name,
                             description: extractDescription(from: content),
                             type: type,
+                            filePath: "",
                             content: content
                         )
                         loaded.append(skill)
@@ -322,15 +303,15 @@ struct SkillsView: View {
                 skills = loaded
             } catch {
                 // Fall back to samples
-                skills = Skill.samples
+                skills = SkillRow.samples
             }
         } else {
             // No skills directory yet — use samples for the preview
-            skills = Skill.samples
+            skills = SkillRow.samples
         }
     }
 
-    private func inferType(from content: String, name: String) -> SkillType {
+    private func inferType(from content: String, name: String) -> Skill.SkillType {
         let lower = content.lowercased()
         if lower.contains("mcp") || lower.contains("tool") {
             return .mcp
@@ -478,7 +459,7 @@ private struct SkillRowView: View {
 // MARK: - SkillTypeBadge
 
 struct SkillTypeBadge: View {
-    let type: SkillType
+    let type: Skill.SkillType
 
     var body: some View {
         Text(type.rawValue)

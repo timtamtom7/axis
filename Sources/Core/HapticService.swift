@@ -3,24 +3,15 @@ import AppKit
 
 enum HapticService {
     static func play(type: HapticType) {
-        let manager = NSHapticFeedbackManager.defaultPerformer
+        let performer = NSHapticFeedbackManager.defaultPerformer
         switch type {
         case .selection:
-            manager.perform(.selection, performanceTime: .default)
-        case .success:
-            manager.perform(.generic, performanceTime: .default)
-        case .warning:
-            manager.perform(.generic, performanceTime: .default)
-        case .error:
-            manager.perform(.negative, performanceTime: .default)
-        case .light:
-            manager.perform(.levelChange, performanceTime: .default)
-        case .medium:
-            manager.perform(.levelChange, performanceTime: .default)
-        case .heavy:
-            manager.perform(.negative, performanceTime: .default)
+            // No macOS equivalent — skip
+            break
+        case .success, .warning, .error, .light, .medium, .heavy:
+            performer.perform(.generic, performanceTime: .default)
         @unknown default:
-            manager.perform(.generic, performanceTime: .default)
+            performer.perform(.generic, performanceTime: .default)
         }
     }
 

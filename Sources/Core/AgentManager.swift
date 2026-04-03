@@ -123,7 +123,7 @@ final class AgentManager: ObservableObject {
             agent.status = .running
 
             // Simulate agent work (placeholder for actual agent execution)
-            let result = await executeAgent(agent: agent, context: context)
+            let result = await executeAgent(agent: agent, context: Chat())
 
             agent.status = .done
             agent.result = result

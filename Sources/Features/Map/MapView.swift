@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Foundation
 
 // MARK: - MapView
 
@@ -150,7 +151,7 @@ struct MapView: View {
 
                 context.stroke(
                     path,
-                    with: .color(PhysicsColor.edge.color.opacity(edge.strength * 0.6 + 0.2)),
+                    with: .color(PhysicsColor.edge.swiftUIColor.opacity(edge.strength * 0.6 + 0.2)),
                     lineWidth: 1
                 )
             }
@@ -175,7 +176,7 @@ struct MapView: View {
                     ))
                     context.fill(
                         glowPath,
-                        with: .color(PhysicsColor.markdown.color.opacity(pulseOpacity * 0.4))
+                        with: .color(PhysicsColor.markdown.swiftUIColor.opacity(pulseOpacity * 0.4))
                     )
                 }
 
@@ -199,10 +200,10 @@ struct MapView: View {
                 ))
 
                 let fillColor = isActive
-                    ? PhysicsColor.markdown.color
-                    : node.color
+                    ? PhysicsColor.markdown.swiftUIColor
+                    : node.color.swiftUIColor
 
-                context.fill(circlePath, with: .color(fillColor.color))
+                context.fill(circlePath, with: .color(fillColor))
 
                 // Border
                 context.stroke(circlePath, with: .color(.white.opacity(0.15)), lineWidth: 1)
@@ -290,7 +291,7 @@ struct MapView: View {
     private func fileInfoPanelView(_ info: FileInfo) -> some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(PhysicsColor.from(fileType: info.node.fileType).color)
+                .fill(PhysicsColor.from(fileType: info.node.fileType).swiftUIColor)
                 .frame(width: 12, height: 12)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -415,7 +416,7 @@ struct MapView: View {
 
     private func handleHover(phase: HoverPhase, in geometry: GeometryProxy) {
         switch phase {
-        case .started(let location):
+        case .active(let location):
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
             let transformed = CGPoint(
                 x: (location.x - center.x - offset.width) / zoom + center.x,
@@ -445,10 +446,10 @@ struct MapView: View {
     // MARK: - Active Node Pulse
 
     private func startPulse() {
-        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), {
             pulseScale = 1.5
             pulseOpacity = 0.2
-        }
+        })
     }
 
     private func stopPulse() {

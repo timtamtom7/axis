@@ -1,11 +1,13 @@
 import Foundation
 import CoreGraphics
 import Combine
+import SwiftUI
 
 // MARK: - PhysicsNode
 
 final class PhysicsNode: Identifiable, Equatable {
     let id: UUID
+    var name: String = ""
     var position: CGPoint
     var velocity: CGVector = .zero
     var size: CGFloat
@@ -16,8 +18,9 @@ final class PhysicsNode: Identifiable, Equatable {
     var forceX: CGFloat = 0
     var forceY: CGFloat = 0
 
-    init(id: UUID, position: CGPoint, size: CGFloat, color: PhysicsColor) {
+    init(id: UUID, name: String = "", position: CGPoint, size: CGFloat, color: PhysicsColor) {
         self.id = id
+        self.name = name
         self.position = position
         self.size = size
         self.color = color
@@ -59,6 +62,10 @@ struct PhysicsColor: Equatable {
     let green: CGFloat
     let blue: CGFloat
     let alpha: CGFloat
+
+    var swiftUIColor: Color {
+        Color(red: red, green: green, blue: blue, opacity: alpha)
+    }
 
     static let swift    = PhysicsColor(red: 0.294, green: 0.620, blue: 1.0,   alpha: 1.0)   // #4B9EFF
     static let markdown = PhysicsColor(red: 0.482, green: 0.380, blue: 1.0,   alpha: 1.0)   // #7B61FF
@@ -139,8 +146,9 @@ final class PhysicsSimulation: ObservableObject {
 
     private(set) var nodes: [PhysicsNode] = []
     private(set) var edges: [PhysicsEdge] = []
+    private var graphNodes: [GraphNode] = []
 
-    private var nodeMap: [UUID: PhysicsNode] = [:]
+    private(set) var nodeMap: [UUID: PhysicsNode] = [:]
 
     // MARK: - Simulation Parameters
 
@@ -173,6 +181,7 @@ final class PhysicsSimulation: ObservableObject {
     func load(nodes: [GraphNode], edges: [GraphEdge]) {
         stop()
 
+        self.graphNodes = nodes
         self.nodes = nodes.enumerated().map { index, node in
             let angle = 2 * CGFloat.pi * CGFloat(index) / CGFloat(max(nodes.count, 1))
             let radius: CGFloat = 150
@@ -182,7 +191,7 @@ final class PhysicsSimulation: ObservableObject {
             )
             let size = nodeRadius(for: node.lineCount)
             let color = PhysicsColor.from(fileType: node.fileType)
-            return PhysicsNode(id: node.id, position: position, size: size, color: color)
+            return PhysicsNode(id: node.id, name: node.name, position: position, size: size, color: color)
         }
 
         self.nodeMap = Dictionary(uniqueKeysWithValues: self.nodes.map { ($0.id, $0) })
@@ -207,6 +216,7 @@ final class PhysicsSimulation: ObservableObject {
     }
 
     func setActiveNode(_ id: UUID?, active: Bool) {
+        guard let id = id else { return }
         nodeMap[id]?.color = active
             ? PhysicsColor(red: 0.482, green: 0.380, blue: 1.0, alpha: 0.8) // pulse tint
             : PhysicsColor.from(fileType: .swift) // restore — we don't store original type; fix below
@@ -271,14 +281,16 @@ final class PhysicsSimulation: ObservableObject {
         guard !nodes.isEmpty else { return }
 
         // Simple radial tree — arrange in concentric circles by path depth
-        let sorted = nodes.sorted { $0.directory.count < $1.directory.count }
+        let indexed: [(PhysicsNode, GraphNode)] = zip(nodes, graphNodes).map { ($0, $1) }
+        let sorted = indexed.sorted { $0.1.directory.count < $1.1.directory.count }
 
         let spacingX: CGFloat = 180
         let spacingY: CGFloat = 120
         let cols = max(1, Int(Double(sorted.count).squareRoot()))
         let startX = -CGFloat(cols - 1) * spacingX / 2
 
-        for (index, node) in sorted.enumerated() {
+        for (index, pair) in sorted.enumerated() {
+            let node = pair.0
             let col = index % cols
             let row = index / cols
             node.position = CGPoint(
@@ -296,13 +308,14 @@ final class PhysicsSimulation: ObservableObject {
         guard !nodes.isEmpty else { return }
 
         // Group nodes by their directory depth (simple proxy)
+        let indexed: [(PhysicsNode, GraphNode)] = zip(nodes, graphNodes).map { ($0, $1) }
         var depthGroups: [[PhysicsNode]] = []
-        for node in nodes {
-            let depth = node.directory.components(separatedBy: "/").count
+        for (physicsNode, graphNode) in indexed {
+            let depth = graphNode.directory.components(separatedBy: "/").count
             while depthGroups.count <= depth {
                 depthGroups.append([])
             }
-            depthGroups[depth].append(node)
+            depthGroups[depth].append(physicsNode)
         }
 
         let spacingX: CGFloat = 200
@@ -443,7 +456,9 @@ final class PhysicsSimulation: ObservableObject {
 
     private var shouldReduceMotion: Bool {
         #if os(macOS)
-        return NSApp.currentAccessibilityReduceMotion
+        // Check System Settings > Accessibility > Display > Reduce motion
+        let key = "NSAccousticReduceMotionEnabled"
+        return UserDefaults.standard.bool(forKey: key)
         #else
         return false
         #endif
